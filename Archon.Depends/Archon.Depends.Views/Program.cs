@@ -18,7 +18,7 @@ namespace Archon.Depends.Views
 
 			foreach (var v in views)
 			{
-				Console.WriteLine(Path.GetFileName(v));
+				Console.WriteLine(Path.Combine(Path.GetDirectoryName(v), Path.GetFileName(v)));
 			}
 
 			Console.WriteLine();
