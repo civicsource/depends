@@ -1,0 +1,5 @@
+C:\dev\Depends\Archon.Depends\Archon.Depends.Views\bin\Debug\Archon.Depends.Views.exe.config
+C:\dev\Depends\Archon.Depends\Archon.Depends.Views\bin\Debug\Archon.Depends.Views.exe
+C:\dev\Depends\Archon.Depends\Archon.Depends.Views\bin\Debug\Archon.Depends.Views.pdb
+C:\dev\Depends\Archon.Depends\Archon.Depends.Views\obj\Debug\Archon.Depends.Views.exe
+C:\dev\Depends\Archon.Depends\Archon.Depends.Views\obj\Debug\Archon.Depends.Views.pdb
