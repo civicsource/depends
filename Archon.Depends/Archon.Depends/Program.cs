@@ -28,12 +28,40 @@ namespace Archon.Depends
 			{
 				Console.WriteLine(c.Name);
 
+				var attributes = c.GetCustomAttributes(typeof(AuthorizeAttribute));
+
+				foreach (var a in attributes)
+				{
+					var attribute = ((AuthorizeAttribute)a);
+					if (attribute.Roles != null)
+					{
+						Console.WriteLine("\t" + attribute.Roles);
+					}
+					else {
+						Console.WriteLine("\t Authorize Attribute");
+					}
+				}
+
 				var methods = c.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
 					.Where(m => !m.IsSpecialName);
 
 				foreach (var a in methods)
 				{
-					Console.WriteLine("\t" + a.Name);
+					Console.WriteLine("\t\t" + a.Name);
+	
+					var methodAttributes = a.GetCustomAttributes(typeof(AuthorizeAttribute));
+
+					foreach (var m in methodAttributes) {
+						var attribute = ((AuthorizeAttribute)m);
+						if (attribute.Roles != null)
+						{
+							Console.WriteLine("\t\t\t" + attribute.Roles);
+						}
+						else
+						{
+							Console.WriteLine("\t\t\t Authorize Attribute");
+						}
+					}
 				}
 
 				actions += methods.Count();
