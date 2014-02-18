@@ -38,21 +38,10 @@ namespace Archon.Depends
 				{
 					Console.WriteLine(controller.Name);
 
-					var attributes = controller.GetCustomAttributes(typeof(AuthorizeAttribute));
+					if (SaveToDatabase)
+						AddController(conn, controller);
 
-					foreach (var a in attributes)
-					{
-						var attribute = ((AuthorizeAttribute)a);
-
-						if (attribute.Roles != null)
-						{
-							Console.WriteLine("\t" + attribute.Roles);
-						}
-						else
-						{
-							Console.WriteLine("\t Authorize Attribute");
-						}
-					}
+					ProcessAttributes(conn, controller);
 
 					var methods = controller.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly)
 						.Where(m => !m.IsSpecialName);
@@ -72,7 +61,13 @@ namespace Archon.Depends
 
 							if (attribute.Roles != null)
 							{
-								Console.WriteLine("\t\t\t" + attribute.Roles);
+								foreach(var at in attribute.Roles.Split(','))
+								{
+									Console.WriteLine("\t\t\t" + at.Trim());
+
+									if (SaveToDatabase)
+										AddActionPermission(conn, at.Trim(), action);
+								}
 							}
 							else
 							{
@@ -91,6 +86,31 @@ namespace Archon.Depends
 			Console.WriteLine(args[0]);
 			Console.WriteLine("Controllers:" + controllers.Count());
 			Console.WriteLine("Actions:" + actions);
+		}
+
+		private static void ProcessAttributes(SqlConnection conn, Type controller)
+		{
+			var attributes = controller.GetCustomAttributes(typeof(AuthorizeAttribute));
+
+			foreach (var a in attributes)
+			{
+				var attribute = ((AuthorizeAttribute)a);
+
+				if (attribute.Roles != null)
+				{
+					foreach (var at in attribute.Roles.Split(','))
+					{
+						Console.WriteLine("\t" + at.Trim());
+
+						if (SaveToDatabase)
+							AddControllerPermission(conn, controller, at);
+					}
+				}
+				else
+				{
+					Console.WriteLine("\t Authorize Attribute");
+				}
+			}
 		}
 
 		private static void VerifyArguments(string[] args)
@@ -118,6 +138,27 @@ namespace Archon.Depends
 					{
 						write.CommandText = "INSERT INTO dep.Applications VALUES(@applicationName)";
 						write.Parameters.AddWithValue("@applicationName", ApplicationName);
+						write.ExecuteNonQuery();
+					}
+				}
+			}
+		}
+
+		private static void AddPermission(SqlConnection conn, string name)
+		{
+			using (SqlCommand command = conn.CreateCommand())
+			{
+				command.CommandText = "SELECT COUNT(*) FROM dep.Permissions WHERE name = @permissionName";
+				command.Parameters.AddWithValue("@permissionName", name);
+
+				var permissions = (int)command.ExecuteScalar();
+
+				if (permissions == 0)
+				{
+					using (var write = conn.CreateCommand())
+					{
+						write.CommandText = "INSERT INTO dep.Permissions VALUES(@permissionName, null)";
+						write.Parameters.AddWithValue("@permissionName", name);
 						write.ExecuteNonQuery();
 					}
 				}
@@ -167,6 +208,50 @@ namespace Archon.Depends
 			}
 		}
 
+		private static void AddControllerPermission(SqlConnection conn, Type controller, string permission)
+		{
+			var controllerId = GetControllerId(conn, controller.FullName);
+			var permissionId = GetPermissionId(conn, permission);
+
+			if (permissionId == 0)
+				AddPermission(conn, permission);
+
+			permissionId = GetPermissionId(conn, permission);
+
+			if (controllerId != 0 && permissionId != 0)
+			{
+				using (var write = conn.CreateCommand())
+				{
+					write.CommandText = "INSERT INTO dep.ControllerPermissions VALUES(@controllerId, @permissionId)";
+					write.Parameters.AddWithValue("@controllerId", controllerId);
+					write.Parameters.AddWithValue("@permissionId", permissionId);
+					write.ExecuteNonQuery();
+				}
+			}
+		}
+
+		private static void AddActionPermission(SqlConnection conn, string permission, MethodInfo action)
+		{
+			var actionId = GetActionId(conn, action.Name);
+			var permissionId = GetPermissionId(conn, permission);
+
+			if (permissionId == 0)
+				AddPermission(conn, permission);
+
+			permissionId = GetPermissionId(conn, permission);
+
+			if (actionId != 0 && permissionId != 0)
+			{
+				using (var write = conn.CreateCommand())
+				{
+					write.CommandText = "INSERT INTO dep.ActionPermissions VALUES(@actionId, @permissionId)";
+					write.Parameters.AddWithValue("@actionId", actionId);
+					write.Parameters.AddWithValue("@permissionId", permissionId);
+					write.ExecuteNonQuery();
+				}
+			}
+		}
+
 		private static int GetApplicationId(SqlConnection conn)
 		{
 			using (SqlCommand command = conn.CreateCommand())
@@ -193,6 +278,46 @@ namespace Archon.Depends
 			{
 				command.CommandText = "SELECT Id FROM dep.Controllers WHERE name = @controllerName";
 				command.Parameters.AddWithValue("@controllername", name);
+
+				using (SqlDataReader data = command.ExecuteReader())
+				{
+					if (data.HasRows)
+					{
+						data.Read();
+						return (int)data["Id"];
+					}
+					else
+						return 0;
+				}
+			}
+		}
+
+		private static int GetPermissionId(SqlConnection conn, string name)
+		{
+			using (SqlCommand command = conn.CreateCommand())
+			{
+				command.CommandText = "SELECT Id FROM dep.Permissions WHERE name = @permissionName";
+				command.Parameters.AddWithValue("@permissionName", name);
+
+				using (SqlDataReader data = command.ExecuteReader())
+				{
+					if (data.HasRows)
+					{
+						data.Read();
+						return (int)data["Id"];
+					}
+					else
+						return 0;
+				}
+			}
+		}
+
+		private static int GetActionId(SqlConnection conn, string name)
+		{
+			using (SqlCommand command = conn.CreateCommand())
+			{
+				command.CommandText = "SELECT Id FROM dep.Actions WHERE name = @actionName";
+				command.Parameters.AddWithValue("@actionName", name);
 
 				using (SqlDataReader data = command.ExecuteReader())
 				{
